@@ -21,6 +21,7 @@ _start:
                 mov             al, 0x0a
                 call            write_char
 
+                lea             rsp, [rsp + 4 * len * 8]
                 jmp             exit
 
 ; muls two long number
@@ -34,16 +35,13 @@ mul_long_long:
                 push            rcx
                 push            rdx
 
-                sub             rsp, 2 * len * 8
-                mov             r9, rsp
-                ;r9  -- answer adress
                 ;r10 -- index 'i' that iterates through [0; rcx - 1]
                 ;r11 -- index 'j' that iterates through [0; rcx - 1]
 
                 push		rdi
                 push		rcx
 
-                mov		rdi, r9
+                mov		rdi, r13
                 lea		rcx, [2 * rcx]
                 call		set_zero
 
@@ -64,13 +62,13 @@ mul_long_long:
 
                 push            rdi
 
-                lea             rdi, [r9 + r10 * 8]
+                lea             rdi, [r13 + r10 * 8]
                 lea             rdi, [rdi + r11 * 8]
                 call            add_long_short ;c[i + j] += a[i] * b[j] (lower part)
 
                 lea             rdi, [rdi + 8]
                 mov             rax, rdx
-                call            add_long_short ;c[i + j] += a[i] * b[j] (upper part)
+                call            add_long_short ;c[i + j + 1] += a[i] * b[j] (upper part)
 
                 pop             rdi
 
@@ -87,22 +85,7 @@ mul_long_long:
 ;i loop ended
 
                 pop             rdi
-                lea             rcx, [2 * rcx] ;new length is |a| + |b|
-	
-                push            r13
 
-.copy_loop:
-                mov             rax, [r9]
-                mov             [r13], rax
-                lea             r9, [r9 + 8]
-                lea             r13, [r13 + 8]
-                dec             rcx
-                test            rcx, rcx
-                jnz             .copy_loop
-
-                pop             r13
-
-                add             rsp, 2 * len * 8
                 pop             rdx
                 pop             rcx
                 pop             rsi
