@@ -1,18 +1,21 @@
                 section         .text
 
                 global          _start
-	        %define		len 512
+	        %define	       len 128
 _start:
 
                 sub             rsp, 4 * len * 8
-                lea             rdi, [rsp + 2 * len * 8]
-                mov             rcx, 2 * len
+                lea             r13, [rsp + 2 * len * 8]
+                lea             rdi, [rsp + len * 8]
+                mov             rcx, len
                 call            read_long
-                mov             rdi, rsp
+                lea             rdi, [rsp]
                 call            read_long
-                lea             rsi, [rsp + 2 * len * 8]
+                lea             rsi, [rsp + len * 8]
                 call            mul_long_long
-
+		
+                mov             rcx, 2 * len
+                mov             rdi, r13
                 call            write_long
 
                 mov             al, 0x0a
@@ -21,21 +24,31 @@ _start:
                 jmp             exit
 
 ; muls two long number
-;    rdi -- address of muliplier #1 (long number)
+;    rdi -- address of multiplier #1 (long number)
 ;    rsi -- address of multiplier #2 (long number)
 ;    rcx -- length of long numbers in qwords
-; result:
-;    mul is written to rdi
+;    r13 -- address of the result
 mul_long_long:
                 push            rdi
                 push            rsi
                 push            rcx
+                push            rdx
 
                 sub             rsp, 2 * len * 8
                 mov             r9, rsp
                 ;r9  -- answer adress
                 ;r10 -- index 'i' that iterates through [0; rcx - 1]
                 ;r11 -- index 'j' that iterates through [0; rcx - 1]
+
+                push		rdi
+                push		rcx
+
+                mov		rdi, r9
+                lea		rcx, [2 * rcx]
+                call		set_zero
+
+                pop		rcx
+                pop		rdi
 
                 push            rdi
                 xor             r10, r10
@@ -61,33 +74,36 @@ mul_long_long:
 
                 pop             rdi
 
-                lea             r11, [r11 + 1]
                 lea             rsi, [rsi + 8]
+                lea             r11, [r11 + 1]
                 cmp             r11, rcx
-                jnz              .j_loop
+                jnz		.j_loop
 ;j loop ended
                 lea             rdi, [rdi + 8]
                 lea             r10, [r10 + 1]
-                cmp             r10, rcx
                 pop             rsi
+                cmp             r10, rcx
                 jnz             .i_loop
 ;i loop ended
 
                 pop             rdi
-                lea             rcx, [rcx + rcx] ;new length is |a| + |b|
+                lea             rcx, [2 * rcx] ;new length is |a| + |b|
+	
+                push            r13
 
 .copy_loop:
+                mov             rax, [r9]
+                mov             [r13], rax
+                lea             r9, [r9 + 8]
+                lea             r13, [r13 + 8]
                 dec             rcx
-                lea             r10, [r9 + rcx]
-                lea             r11, [rdi + rcx]
-                mov             r10, [r10]
-                mov             [r11], r10
-
                 test            rcx, rcx
                 jnz             .copy_loop
 
+                pop             r13
 
                 add             rsp, 2 * len * 8
+                pop             rdx
                 pop             rcx
                 pop             rsi
                 pop             rdi
@@ -111,13 +127,14 @@ add_long_short:
                 mov             rax, rdx
                 xor             rdx, rdx
                 add             rdi, 8
-		cmp		rax, 0
-		je		.outer_loop
+                cmp             rax, 0
+                jne             .loop
+                cmp             rdx, 0
+                je              .outer_loop
                 dec             rcx
                 jnz             .loop
 
 .outer_loop:
-
                 pop             rdx
                 pop             rcx
                 pop             rdi

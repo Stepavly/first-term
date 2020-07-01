@@ -1,7 +1,7 @@
                 section         .text
 
                 global          _start
-		        %define 		len 128
+		%define		len 128
 _start:
 
                 sub             rsp, 2 * len * 8
