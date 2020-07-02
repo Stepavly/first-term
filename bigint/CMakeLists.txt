@@ -11,8 +11,8 @@ add_executable(big_integer_testing
                big_integer.cpp
                gtest/gtest-all.cc
                gtest/gtest.h
-               gtest/gtest_main.cc 
-               big_integer_gmp.cpp 
+               gtest/gtest_main.cc
+               big_integer_gmp.cpp
                big_integer_gmp.h)
 
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
