@@ -125,7 +125,7 @@ struct big_integer {
 	}
 
 	std::pair<big_integer, uint32_t> div_mod_short(uint32_t rhs);
-	big_integer div_long(big_integer const &rhs);
+	std::pair<big_integer, big_integer> div_mod_long(big_integer const &rhs);
 
 	bool sign;
 	std::vector<uint32_t> dig;
