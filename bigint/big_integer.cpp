@@ -56,13 +56,23 @@ big_integer::big_integer(const std::string &str) : big_integer() {
 		throw std::length_error("can not create big_int from empty string");
 	}
 
-	for (size_t i = isdigit(str[0]) ? 0 : 1; i < str.size(); i++) {
-		if (!isdigit(str[i])) {
-			throw std::runtime_error(std::string("digit expected, ") + str[i] + " found");
+	for (size_t i = isdigit(str[0]) ? 0 : 1; i < str.size(); ) {
+		uint32_t to_mult = 1;
+		uint32_t to_add = 0;
+		size_t j = i;
+
+		for (; j < str.size() && j - i < 9; j++) {
+			if (!isdigit(str[j])) {
+				throw std::runtime_error(std::string("digit expected, ") + str[j] + " found");
+			}
+
+			to_mult *= 10;
+			to_add = 10 * to_add + str[j] - '0';
 		}
 
-		*this *= 10;
-		*this += str[i] - '0';
+		*this *= to_mult;
+		*this += to_add;
+		i = j;
 	}
 
 	sign = str[0] != '-';
@@ -87,19 +97,19 @@ big_integer &big_integer::operator=(big_integer const &other) {
 }
 
 int compare(const big_integer &a, const big_integer &b) {
-	if (a.dig.size() > b.dig.size()) {
+	if (a.size() > b.size()) {
 		return a.positive() ? +1 : -1;
-	} else if (a.dig.size() < b.dig.size()) {
+	} else if (a.size() < b.size()) {
 		return b.positive() ? -1 : +1;
 	} else {
 		if (a.positive() != b.positive()) {
 			return a.positive() ? +1 : -1;
 		}
 
-		for (size_t i = a.dig.size(); i > 0; i--) {
-			if (a.dig[i - 1] < b.dig[i - 1]) {
+		for (size_t i = a.size(); i > 0; i--) {
+			if (a[i - 1] < b[i - 1]) {
 				return a.positive() ? -1 : +1;
-			} else if (a.dig[i - 1] > b.dig[i - 1]) {
+			} else if (a[i - 1] > b[i - 1]) {
 				return a.positive() ? +1 : -1;
 			}
 		}
@@ -111,23 +121,18 @@ int compare(const big_integer &a, const big_integer &b) {
 bool operator==(const big_integer &a, const big_integer &b) {
 	return compare(a, b) == 0;
 }
-
 bool operator!=(const big_integer &a, const big_integer &b) {
 	return compare(a, b) != 0;
 }
-
 bool operator<(const big_integer &a, const big_integer &b) {
 	return compare(a, b) < 0;
 }
-
 bool operator>(const big_integer &a, const big_integer &b) {
 	return compare(a, b) > 0;
 }
-
 bool operator<=(const big_integer &a, const big_integer &b) {
 	return compare(a, b) <= 0;
 }
-
 bool operator>=(const big_integer &a, const big_integer &b) {
 	return compare(a, b) >= 0;
 }
@@ -145,15 +150,15 @@ void big_integer::normalize() {
 big_integer big_integer::operator+() const {
 	return *this;
 }
-
 big_integer big_integer::operator-() const {
 	big_integer negative(*this);
+
 	if (!negative.is_zero()) {
 		negative.sign = !negative.sign;
 	}
+
 	return negative;
 }
-
 big_integer big_integer::operator~() const {
 	return -(*this) - 1;
 }
@@ -165,19 +170,15 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
 		return *this -= -rhs;
 	}
 
+	dig.resize(std::max(size(), rhs.size()) + 1, 0u);
+
 	uint32_t carry = 0;
 
-	for (size_t i = 0; i < rhs.dig.size() || carry > 0; i++) {
-		arithmetic_t curDig(0, carry);
+	for (size_t i = 0; i < rhs.size() || carry > 0; i++) {
+		arithmetic_t curDig = add(carry, dig[i]);
 
-		while (i >= dig.size()) {
-			dig.push_back(0);
-		}
-
-		curDig = add(carry, dig[i]);
-
-		if (i < rhs.dig.size()) {
-			auto temp = add(curDig.second, rhs.dig[i]);
+		if (i < rhs.size()) {
+			auto temp = add(curDig.second, rhs[i]);
 			curDig = std::make_pair(curDig.first + temp.first, temp.second);
 		}
 
@@ -189,7 +190,6 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
 
 	return *this;
 }
-
 big_integer &big_integer::operator-=(big_integer const &rhs) {
 	if (rhs == 0) {
 		return *this;
@@ -220,7 +220,6 @@ big_integer &big_integer::operator-=(big_integer const &rhs) {
 
 	return *this;
 }
-
 big_integer &big_integer::operator*=(big_integer const &rhs) {
 	dig.resize(dig.size() + rhs.dig.size());
 	sign = sign == rhs.sign;
@@ -261,7 +260,7 @@ std::pair<big_integer, uint32_t> big_integer::div_mod_short(uint32_t rhs) {
 	for (size_t i = dig.size(); i > 0; i--) {
 		remainder <<= 32u;
 		remainder += dig[i - 1];
-		uint32_t ratio = static_cast<uint32_t>(remainder / rhs);
+		uint32_t ratio = remainder / rhs;
 		remainder -= ratio * rhs;
 		quotient.dig[i - 1] = ratio;
 	}
@@ -270,11 +269,7 @@ std::pair<big_integer, uint32_t> big_integer::div_mod_short(uint32_t rhs) {
 	return std::make_pair(quotient, static_cast<uint32_t>(remainder));
 }
 
-big_integer big_integer::div_long(big_integer const &rhs) {
-	if (rhs.size() == 1) {
-		return sign == rhs.sign ? div_mod_short(rhs[0]).first : -div_mod_short(rhs[0]).first;
-	}
-
+std::pair<big_integer, big_integer> big_integer::div_mod_long(big_integer const &rhs) {
 	big_integer quotient(sign == rhs.sign, {});
 	quotient.dig.resize(dig.size() - rhs.dig.size() + 1);
 	big_integer rhs_abs = abs(rhs);
@@ -284,9 +279,9 @@ big_integer big_integer::div_long(big_integer const &rhs) {
 	size_t n = dig.size(), m = rhs.dig.size() + 1;
 
 	uint64_t y = static_cast<uint64_t>(rhs_abs.dig.back()) << 32u;
-	y |= static_cast<uint64_t>(rhs_abs[rhs_abs.size() - 2]);
+	y |= static_cast<uint64_t>(rhs_abs.dig[rhs_abs.dig.size() - 2]);
 
-	for (size_t i = m - 1, j = quotient.size() - 1; i != n; i++, j--) {
+	for (size_t i = m - 1, j = quotient.dig.size() - 1; i != n; i++, j--) {
 		uint128_t x = static_cast<uint128_t>(dig.back()) << 64u;
 		x |= static_cast<uint128_t>(dig[dig.size() - 2]) << 32u;
 		x |= static_cast<uint128_t>(dig[dig.size() - 3]);
@@ -296,8 +291,8 @@ big_integer big_integer::div_long(big_integer const &rhs) {
 
 		bool is_less = true;
 
-		for (size_t k = 1; k <= size(); k++) {
-			uint32_t sub_dig = m - k < to_sub.size() ? to_sub[m - k] : 0;
+		for (size_t k = 1; k <= dig.size(); k++) {
+			uint32_t sub_dig = m - k < to_sub.dig.size() ? to_sub.dig[m - k] : 0;
 
 			if (dig[dig.size() - k] != sub_dig) {
 				is_less = dig[dig.size() - k] > sub_dig;
@@ -310,7 +305,7 @@ big_integer big_integer::div_long(big_integer const &rhs) {
 			to_sub -= rhs_abs;
 		}
 
-		quotient[j] = ratio;
+		quotient.dig[j] = ratio;
 
 		size_t start = dig.size() - m;
 		bool take = false;
@@ -318,8 +313,8 @@ big_integer big_integer::div_long(big_integer const &rhs) {
 		for (size_t k = 0; k < m; k++) {
 			int64_t diff =
 					static_cast<int64_t>(dig[start + k]) -
-							static_cast<int64_t>(k < to_sub.size() ? to_sub[k] : 0) -
-							static_cast<int64_t>(take ? 1 : 0);
+					static_cast<int64_t>(k < to_sub.dig.size() ? to_sub.dig[k] : 0) -
+					static_cast<int64_t>(take);
 
 			take = diff < 0;
 
@@ -335,22 +330,28 @@ big_integer big_integer::div_long(big_integer const &rhs) {
 		}
 	}
 
+	normalize();
 	quotient.normalize();
-	return quotient;
+
+	return std::make_pair(quotient, *this);
 }
 
 big_integer &big_integer::operator/=(big_integer const &rhs) {
 	if (rhs.is_zero()) {
-		throw std::runtime_error("division by zero");
+		throw std::range_error("division by zero");
 	} else if (abs(*this) < abs(rhs)) {
 		return *this = big_integer(0);
+	} else if (rhs.size() == 1) {
+		return *this = sign == rhs.sign ? div_mod_short(rhs[0]).first : -div_mod_short(rhs[0]).first;
 	} else {
-		return *this = div_long(rhs);
+		return *this = div_mod_long(rhs).first;
 	}
 }
 big_integer &big_integer::operator%=(big_integer const &rhs) {
 	if (rhs.is_zero()) {
-		throw std::runtime_error("division by zero");
+		throw std::range_error("division by zero");
+	} else if (rhs.size() == 1) {
+		return *this = sign ? big_integer(div_mod_short(rhs[0]).second) : -big_integer(div_mod_short(rhs[0]).second);
 	} else {
 		return *this = *this - *this / rhs * rhs;
 	}
@@ -454,22 +455,21 @@ std::string to_string(big_integer a) {
 	std::string sign = a.positive() ? "" : "-";
 
 	a = abs(a);
-	size_t leading_zeros = 0;
+	size_t needZero = 0;
+
+	const uint32_t dig_remainder = 1000000000;
+	const uint32_t dig_count = 9;
 
 	do {
-//		auto rem_and_dig = a.div_mod_short(1000000000);
-//		std::string d = std::to_string(rem_and_dig.second) + std::string(leading_zeros, '0');
-//		leading_zeros = 9u - d.size();
-//		std::reverse(d.begin(), d.end());
-//		result += d;
-//		a = rem_and_dig.first;
-
-		std::string d = std::to_string((a % 1000000000)[0]) + std::string(leading_zeros, '0');
-		leading_zeros = 9u - d.size();
+		auto div_and_mod = a.div_mod_short(dig_remainder);
+		std::string d = std::to_string(div_and_mod.second);
+		std::string t = std::string(needZero, '0');
+		needZero = dig_count - d.size();
+		d += t;
 		std::reverse(d.begin(), d.end());
 		result += d;
-		a /= 1000000000;
-	} while (!a.is_zero());
+		a = div_and_mod.first;
+	} while (a != 0);
 
 	result += sign;
 
