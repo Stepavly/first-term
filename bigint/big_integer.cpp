@@ -24,7 +24,7 @@ big_integer abs(const big_integer &a) {
 static arithmetic_t add(uint32_t a, uint32_t b) {
 	arithmetic_t result(0u, a + b);
 
-	if (0xFFFFFFFFu - a < b) {
+	if (UINT32_MAX - a < b) {
 		result.first = 1;
 	}
 
@@ -121,18 +121,23 @@ int compare(const big_integer &a, const big_integer &b) {
 bool operator==(const big_integer &a, const big_integer &b) {
 	return compare(a, b) == 0;
 }
+
 bool operator!=(const big_integer &a, const big_integer &b) {
 	return compare(a, b) != 0;
 }
+
 bool operator<(const big_integer &a, const big_integer &b) {
 	return compare(a, b) < 0;
 }
+
 bool operator>(const big_integer &a, const big_integer &b) {
 	return compare(a, b) > 0;
 }
+
 bool operator<=(const big_integer &a, const big_integer &b) {
 	return compare(a, b) <= 0;
 }
+
 bool operator>=(const big_integer &a, const big_integer &b) {
 	return compare(a, b) >= 0;
 }
@@ -150,6 +155,7 @@ void big_integer::normalize() {
 big_integer big_integer::operator+() const {
 	return *this;
 }
+
 big_integer big_integer::operator-() const {
 	big_integer negative(*this);
 
@@ -159,6 +165,7 @@ big_integer big_integer::operator-() const {
 
 	return negative;
 }
+
 big_integer big_integer::operator~() const {
 	return -(*this) - 1;
 }
@@ -190,6 +197,7 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
 
 	return *this;
 }
+
 big_integer &big_integer::operator-=(big_integer const &rhs) {
 	if (rhs == 0) {
 		return *this;
@@ -200,26 +208,12 @@ big_integer &big_integer::operator-=(big_integer const &rhs) {
 		return *this = -(temp -= *this);
 	}
 
-	bool take = false;
-
-	for (size_t i = 0; i < dig.size(); i++) {
-		int64_t diff = static_cast<int64_t>(dig[i])
-				- static_cast<int64_t>(i < rhs.dig.size() ? rhs.dig[i] : 0)
-				- static_cast<int64_t>(take);
-
-		take = diff < 0;
-
-		if (diff < 0) {
-			diff = static_cast<uint64_t>(diff) & UINT32_MAX;
-		}
-
-		dig[i] = static_cast<uint32_t>(diff);
-	}
-
+	difference(rhs, 0);
 	normalize();
 
 	return *this;
 }
+
 big_integer &big_integer::operator*=(big_integer const &rhs) {
 	dig.resize(dig.size() + rhs.dig.size());
 	sign = sign == rhs.sign;
@@ -278,56 +272,24 @@ std::pair<big_integer, big_integer> big_integer::div_mod_long(big_integer const 
 	dig.push_back(0u);
 	size_t n = dig.size(), m = rhs.dig.size() + 1;
 
-	uint64_t y = static_cast<uint64_t>(rhs_abs.dig.back()) << 32u;
-	y |= static_cast<uint64_t>(rhs_abs.dig[rhs_abs.dig.size() - 2]);
+	uint64_t denominator = static_cast<uint64_t>(rhs_abs.dig.back()) << 32u;
+	denominator |= static_cast<uint64_t>(rhs_abs.dig[rhs_abs.dig.size() - 2]);
 
 	for (size_t i = m - 1, j = quotient.dig.size() - 1; i != n; i++, j--) {
-		uint128_t x = static_cast<uint128_t>(dig.back()) << 64u;
-		x |= static_cast<uint128_t>(dig[dig.size() - 2]) << 32u;
-		x |= static_cast<uint128_t>(dig[dig.size() - 3]);
+		uint128_t numerator = static_cast<uint128_t>(dig.back()) << 64u;
+		numerator |= static_cast<uint128_t>(dig[dig.size() - 2]) << 32u;
+		numerator |= static_cast<uint128_t>(dig[dig.size() - 3]);
 
-		uint32_t ratio = static_cast<uint32_t>(x / y);
+		uint32_t ratio = static_cast<uint32_t>(numerator / denominator);
 		big_integer to_sub = rhs_abs * ratio;
 
-		bool is_less = true;
-
-		for (size_t k = 1; k <= dig.size(); k++) {
-			uint32_t sub_dig = m - k < to_sub.dig.size() ? to_sub.dig[m - k] : 0;
-
-			if (dig[dig.size() - k] != sub_dig) {
-				is_less = dig[dig.size() - k] > sub_dig;
-				break;
-			}
-		}
-
-		if (!is_less) {
+		if (!(*this).is_smaller(to_sub, m)) {
 			ratio--;
 			to_sub -= rhs_abs;
 		}
 
 		quotient.dig[j] = ratio;
-
-		size_t start = dig.size() - m;
-		bool take = false;
-
-		for (size_t k = 0; k < m; k++) {
-			int64_t diff =
-					static_cast<int64_t>(dig[start + k]) -
-					static_cast<int64_t>(k < to_sub.dig.size() ? to_sub.dig[k] : 0) -
-					static_cast<int64_t>(take);
-
-			take = diff < 0;
-
-			if (diff < 0) {
-				diff = static_cast<uint64_t>(diff) & UINT32_MAX;
-			}
-
-			dig[start + k] = static_cast<uint32_t>(diff);
-		}
-
-		if (!dig.back()) {
-			dig.pop_back();
-		}
+		(*this).difference(to_sub, dig.size() - m);
 	}
 
 	normalize();
@@ -347,6 +309,7 @@ big_integer &big_integer::operator/=(big_integer const &rhs) {
 		return *this = div_mod_long(rhs).first;
 	}
 }
+
 big_integer &big_integer::operator%=(big_integer const &rhs) {
 	if (rhs.is_zero()) {
 		throw std::range_error("division by zero");
@@ -360,15 +323,19 @@ big_integer &big_integer::operator%=(big_integer const &rhs) {
 big_integer operator+(big_integer a, const big_integer &b) {
 	return a += b;
 }
+
 big_integer operator-(big_integer a, const big_integer &b) {
 	return a -= b;
 }
+
 big_integer operator*(big_integer a, const big_integer &b) {
 	return a *= b;
 }
+
 big_integer operator/(big_integer a, const big_integer &b) {
 	return a /= b;
 }
+
 big_integer operator%(big_integer a, const big_integer &b) {
 	return a %= b;
 }
@@ -376,9 +343,11 @@ big_integer operator%(big_integer a, const big_integer &b) {
 big_integer &big_integer::operator&=(big_integer const &rhs) {
 	return *this = bit_function_applier(*this, rhs, std::bit_and<uint32_t>());
 }
+
 big_integer &big_integer::operator|=(big_integer const &rhs) {
 	return *this = bit_function_applier(*this, rhs, std::bit_or<uint32_t>());
 }
+
 big_integer &big_integer::operator^=(big_integer const &rhs) {
 	return *this = bit_function_applier(*this, rhs, std::bit_xor<uint32_t>());
 }
@@ -404,6 +373,7 @@ static big_integer pow(big_integer a, size_t power) {
 big_integer &big_integer::operator<<=(uint32_t rhs) {
 	return *this *= pow(2, rhs);
 }
+
 big_integer &big_integer::operator>>=(uint32_t rhs) {
 	while (rhs-- > 0) {
 		if (positive()) {
@@ -419,9 +389,11 @@ big_integer &big_integer::operator>>=(uint32_t rhs) {
 big_integer operator&(big_integer a, const big_integer &b) {
 	return a &= b;
 }
+
 big_integer operator|(big_integer a, const big_integer &b) {
 	return a |= b;
 }
+
 big_integer operator^(big_integer a, const big_integer &b) {
 	return a ^= b;
 }
@@ -429,6 +401,7 @@ big_integer operator^(big_integer a, const big_integer &b) {
 big_integer operator<<(big_integer a, uint32_t b) {
 	return a <<= b;
 }
+
 big_integer operator>>(big_integer a, uint32_t b) {
 	return a >>= b;
 }
@@ -436,14 +409,17 @@ big_integer operator>>(big_integer a, uint32_t b) {
 big_integer &big_integer::operator++() {
 	return *this += 1;
 }
+
 big_integer big_integer::operator++(int) {
 	big_integer copy(*this);
 	++*this;
 	return copy;
 }
+
 big_integer &big_integer::operator--() {
 	return *this -= 1;
 }
+
 big_integer big_integer::operator--(int) {
 	big_integer copy(*this);
 	--*this;
