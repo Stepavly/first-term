@@ -5,7 +5,6 @@
 #include <vector>
 
 struct uint32_storage {
-	uint32_storage();
 	uint32_storage(std::vector<uint32_t> const &other);
 	uint32_storage(uint32_t);
 	uint32_storage(uint32_storage const &other);

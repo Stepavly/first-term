@@ -1,15 +1,9 @@
 #include "optimized_storage.h"
 #include <utility>
 
-uint32_storage::uint32_storage() :
-		is_small(true),
-		small_size(1) {
-	std::fill(so.small, so.small + SMALL_CAPACITY, 0u);
-}
-
-uint32_storage::uint32_storage(uint32_t value) :
-		is_small(true),
-		small_size(1) {
+uint32_storage::uint32_storage(uint32_t value)
+		: is_small(true)
+		, small_size(1) {
 	so.small[0] = value;
 }
 
@@ -115,7 +109,7 @@ void uint32_storage::pop_back() {
 	}
 }
 
-uint32_t& uint32_storage::back() {
+uint32_t &uint32_storage::back() {
 	if (is_small) {
 		return so.small[small_size - 1];
 	} else if (so.big->unique()) {
