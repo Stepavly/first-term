@@ -65,21 +65,60 @@ struct big_integer {
  private:
 	big_integer(bool sign, std::vector<uint32_t> digits);
 	friend int compare(const big_integer &a, const big_integer &b);
+
+	bool is_smaller(const big_integer &other, size_t other_size) {
+		for (size_t i = 1; i <= dig.size(); i++) {
+			uint32_t other_dig = other_size - i < other.dig.size() ? other.dig[other_size - i] : 0u;
+
+			if (dig[dig.size() - i] != other_dig) {
+				return dig[dig.size() - i] >= other_dig;
+			}
+		}
+
+		return true;
+	}
+
+	void difference(const big_integer &other, size_t shift) {
+		bool take = false;
+
+		for (size_t k = 0; k + shift < size(); k++) {
+			int64_t diff = static_cast<int64_t>(dig[shift + k]);
+			diff -= static_cast<int64_t>(k < other.size() ? other[k] : 0);
+			diff -= static_cast<int64_t>(take);
+
+			take = diff < 0;
+
+			if (diff < 0) {
+				diff = static_cast<uint64_t>(diff) & UINT32_MAX;
+			}
+
+			dig[shift + k] = static_cast<uint32_t>(diff);
+		}
+
+		if (!dig.back()) {
+			dig.pop_back();
+		}
+	}
+
 	uint32_t operator[](size_t index) const {
 		return dig[index];
 	}
+
 	uint32_t &operator[](size_t index) {
 		return dig[index];
 	}
+
 	size_t size() const {
 		return dig.size();
 	}
+
 	void normalize();
 
 	template<class BitFunction>
-	friend big_integer bit_function_applier(big_integer lhs,
-	                                        big_integer rhs,
-	                                        BitFunction const &bit_function) {
+	friend big_integer bit_function_applier
+			(big_integer lhs,
+			 big_integer rhs,
+			 BitFunction const &bit_function) {
 		size_t result_len = std::max(lhs.size(), rhs.size()) + 1;
 
 		if (!lhs.sign) {
