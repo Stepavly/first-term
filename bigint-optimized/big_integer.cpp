@@ -41,14 +41,14 @@ big_integer::big_integer() : sign(true), dig({0u}) {}
 
 big_integer::big_integer(const big_integer &other) : sign(other.sign), dig(other.dig) {}
 
-big_integer::big_integer(int a) {
-	sign = a >= 0;
-	dig = std::vector<uint32_t>(1, a == INT32_MIN ? static_cast<uint32_t>(INT32_MAX) + 1 : static_cast<uint32_t>(abs(a)));
+big_integer::big_integer(int a)
+		: sign(a >= 0)
+		, dig({a == INT32_MIN ? static_cast<uint32_t>(INT32_MAX) + 1 : static_cast<uint32_t>(abs(a))}) {
 }
 
-big_integer::big_integer(uint32_t a) : sign(true) {
-	dig = std::vector<uint32_t>();
-	dig.push_back(a);
+big_integer::big_integer(uint32_t a)
+		: sign(true)
+		, dig({a}) {
 }
 
 big_integer::big_integer(const std::string &str) : big_integer() {
@@ -56,7 +56,7 @@ big_integer::big_integer(const std::string &str) : big_integer() {
 		throw std::length_error("can not create big_int from empty string");
 	}
 
-	for (size_t i = isdigit(str[0]) ? 0 : 1; i < str.size(); ) {
+	for (size_t i = isdigit(str[0]) ? 0 : 1; i < str.size();) {
 		uint32_t to_mult = 1;
 		uint32_t to_add = 0;
 		size_t j = i;
@@ -82,7 +82,7 @@ big_integer::big_integer(const std::string &str) : big_integer() {
 	}
 }
 
-big_integer::big_integer(bool sign, std::vector<uint32_t> digits) : sign(sign), dig(std::move(digits)) {
+big_integer::big_integer(bool sign, std::vector<uint32_t> const &digits) : sign(sign), dig(digits) {
 	normalize();
 }
 
@@ -177,7 +177,7 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
 		return *this -= -rhs;
 	}
 
-	dig.resize(std::max(size(), rhs.size()) + 1, 0u);
+	dig.increase_size(std::max(size(), rhs.size()) + 1, 0u);
 
 	uint32_t carry = 0;
 
@@ -199,7 +199,7 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
 }
 
 big_integer &big_integer::operator-=(big_integer const &rhs) {
-	if (rhs == 0) {
+	if (rhs.is_zero()) {
 		return *this;
 	} else if (sign != rhs.sign) {
 		return *this += -rhs;
@@ -215,7 +215,7 @@ big_integer &big_integer::operator-=(big_integer const &rhs) {
 }
 
 big_integer &big_integer::operator*=(big_integer const &rhs) {
-	dig.resize(dig.size() + rhs.dig.size());
+	dig.increase_size(dig.size() + rhs.dig.size());
 	sign = sign == rhs.sign;
 
 	for (size_t k = dig.size(); k > 0; k--) {
@@ -248,7 +248,7 @@ big_integer &big_integer::operator*=(big_integer const &rhs) {
 
 std::pair<big_integer, uint32_t> big_integer::div_mod_short(uint32_t rhs) {
 	big_integer quotient;
-	quotient.dig.resize(size(), 0u);
+	quotient.dig.increase_size(size(), 0u);
 	uint64_t remainder = 0;
 
 	for (size_t i = dig.size(); i > 0; i--) {
@@ -265,7 +265,7 @@ std::pair<big_integer, uint32_t> big_integer::div_mod_short(uint32_t rhs) {
 
 std::pair<big_integer, big_integer> big_integer::div_mod_long(big_integer const &rhs) {
 	big_integer quotient(sign == rhs.sign, {});
-	quotient.dig.resize(dig.size() - rhs.dig.size() + 1);
+	quotient.dig.increase_size(dig.size() - rhs.dig.size() + 1);
 	big_integer rhs_abs = abs(rhs);
 
 	big_integer dividend(*this);

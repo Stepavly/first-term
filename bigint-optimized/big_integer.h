@@ -64,7 +64,7 @@ struct big_integer {
 	bool is_zero() const;
 
  private:
-	big_integer(bool sign, std::vector<uint32_t> digits);
+	big_integer(bool sign, std::vector<uint32_t> const &digits);
 	friend int compare(const big_integer &a, const big_integer &b);
 
 	bool is_smaller(const big_integer &other, size_t other_size) {
@@ -119,29 +119,29 @@ struct big_integer {
 	friend big_integer bit_function_applier
 			(big_integer lhs,
 			 big_integer rhs,
-			 BitFunction const &bit_function)   {
+			 BitFunction const &bit_function) {
 		size_t result_len = std::max(lhs.size(), rhs.size()) + 1;
 
 		if (!lhs.sign) {
 			++lhs;
-			lhs.dig.resize(result_len, 0u);
+			lhs.dig.increase_size(result_len, 0u);
 
 			for (size_t i = 0; i < result_len; i++) {
 				lhs[i] = ~lhs[i];
 			}
 		} else {
-			lhs.dig.resize(result_len, 0u);
+			lhs.dig.increase_size(result_len, 0u);
 		}
 
 		if (!rhs.sign) {
 			++rhs;
-			rhs.dig.resize(result_len, 0u);
+			rhs.dig.increase_size(result_len, 0u);
 
 			for (size_t i = 0; i < result_len; i++) {
 				rhs[i] = ~rhs[i];
 			}
 		} else {
-			rhs.dig.resize(result_len, 0u);
+			rhs.dig.increase_size(result_len, 0u);
 		}
 
 		std::vector<uint32_t> result_num(result_len);

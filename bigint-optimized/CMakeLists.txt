@@ -16,7 +16,6 @@ add_executable(big_integer_testing
                big_integer_gmp.h
                optimized_storage.cpp
                optimized_storage.h
-               my_shared_pointer.cpp
                my_shared_pointer.h)
 
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)

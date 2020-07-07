@@ -16,7 +16,6 @@ struct my_shared_pointer {
 		return ref_counter == 1;
 	}
 
- private:
 	size_t ref_counter;
 	std::vector<uint32_t> data;
 };
