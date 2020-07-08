@@ -312,7 +312,7 @@ std::pair<big_integer, big_integer> big_integer::div_mod_long(big_integer const 
 big_integer &big_integer::operator/=(big_integer const &rhs) {
 	if (rhs.is_zero()) {
 		throw std::range_error("division by zero");
-	} else if (rhs.size() > size() || !(*this).is_smaller(rhs, size())) {
+	} else if (rhs.size() > size() || !this->is_smaller(rhs, size())) {
 		return *this = 0;
 	} else if (rhs.size() == 1) {
 		return *this = sign == rhs.sign ? div_mod_short(rhs[0]).first : -div_mod_short(rhs[0]).first;
