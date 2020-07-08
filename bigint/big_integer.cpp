@@ -78,6 +78,35 @@ big_integer &big_integer::operator=(big_integer const &other) {
 	return *this;
 }
 
+bool big_integer::is_smaller(const big_integer &other, size_t other_size) {
+	for (size_t i = 1; i <= dig.size(); i++) {
+		uint32_t other_dig = other_size - i < other.dig.size() ? other.dig[other_size - i] : 0u;
+
+		if (dig[dig.size() - i] != other_dig) {
+			return dig[dig.size() - i] >= other_dig;
+		}
+	}
+
+	return true;
+}
+
+void big_integer::difference(const big_integer &other, size_t shift) {
+	bool take = false;
+
+	for (size_t k = 0; k + shift < size(); k++) {
+		int64_t diff = static_cast<int64_t>(dig[shift + k]);
+		diff -= static_cast<int64_t>(k < other.size() ? other[k] : 0);
+		diff -= static_cast<int64_t>(take);
+
+		take = diff < 0;
+		dig[shift + k] = static_cast<uint32_t>(diff);
+	}
+
+	if (!dig.back()) {
+		dig.pop_back();
+	}
+}
+
 int compare(const big_integer &a, const big_integer &b) {
 	if (a.size() > b.size()) {
 		return a.positive() ? +1 : -1;
@@ -322,6 +351,19 @@ big_integer operator%(big_integer a, const big_integer &b) {
 	return a %= b;
 }
 
+void big_integer::transform_to_compl2(big_integer &a, size_t new_size) {
+	if (!a.sign) {
+		++a;
+		a.dig.resize(new_size, 0u);
+
+		for (uint32_t &x : a.dig) {
+			x = ~x;
+		}
+	} else {
+		a.dig.resize(new_size, 0u);
+	}
+}
+
 big_integer &big_integer::operator&=(big_integer const &rhs) {
 	return *this = bit_function_applier(*this, rhs, std::bit_and<uint32_t>());
 }
@@ -332,6 +374,51 @@ big_integer &big_integer::operator|=(big_integer const &rhs) {
 
 big_integer &big_integer::operator^=(big_integer const &rhs) {
 	return *this = bit_function_applier(*this, rhs, std::bit_xor<uint32_t>());
+}
+
+big_integer big_integer::bit_shift(ptrdiff_t shift) {
+	big_integer shifted(sign, dig);
+	sign = true;
+
+	if (shift > 0) {
+		shifted.dig.resize(shifted.size() + shift / (32 - 1) + 2);
+	}
+
+	transform_to_compl2(*this, size());
+
+	for (size_t i = 0; i < shifted.size(); i++) {
+		ptrdiff_t start_bit = i * 32 - shift;
+		ptrdiff_t end_bit = (i + 1) * 32 - 1 - shift;
+		ptrdiff_t start_block = start_bit / 32u;
+		ptrdiff_t end_block = end_bit / 32u;
+
+		uint32_t cnt = (32 - shift % 32) % 32;
+		uint32_t left_block, right_block;
+
+		if ((start_bit < 0 && shift >= 0) || start_block >= static_cast<ptrdiff_t>(dig.size())) {
+			left_block = 0;
+		} else {
+			left_block = dig[start_block];
+		}
+
+		if ((end_bit < 0 && shift >= 0) || end_block >= static_cast<ptrdiff_t>(dig.size())) {
+			right_block = 0;
+		} else {
+			right_block = dig[end_block];
+		}
+
+		left_block >>= cnt;
+		right_block &= (1U << cnt) - 1U;
+
+		shifted[i] = (cnt ? (right_block << (32u - cnt)) : 0) + left_block;
+	}
+
+	if (shift < 0 && !shifted.sign) {
+		--shifted;
+	}
+
+	shifted.normalize();
+	return shifted;
 }
 
 big_integer &big_integer::operator<<=(uint32_t rhs) {
