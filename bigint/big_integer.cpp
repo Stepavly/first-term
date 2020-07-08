@@ -26,7 +26,7 @@ big_integer::big_integer(const big_integer &other) : sign(other.sign), dig(other
 
 big_integer::big_integer(int a) {
 	sign = a >= 0;
-	dig = std::vector<uint32_t>({static_cast<uint32_t>(abs(static_cast<int64_t>(a)))});
+	dig = std::vector<uint32_t>({static_cast<uint32_t>(std::abs(static_cast<int64_t>(a)))});
 }
 
 big_integer::big_integer(uint32_t a) : sign(true), dig({a}) {}
