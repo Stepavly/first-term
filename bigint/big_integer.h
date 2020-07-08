@@ -87,11 +87,6 @@ struct big_integer {
 			diff -= static_cast<int64_t>(take);
 
 			take = diff < 0;
-
-			if (diff < 0) {
-				diff = diff & UINT32_MAX;
-			}
-
 			dig[shift + k] = static_cast<uint32_t>(diff);
 		}
 
