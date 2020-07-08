@@ -89,7 +89,7 @@ struct big_integer {
 			take = diff < 0;
 
 			if (diff < 0) {
-				diff = static_cast<uint64_t>(diff) & UINT32_MAX;
+				diff = diff & UINT32_MAX;
 			}
 
 			dig[shift + k] = static_cast<uint32_t>(diff);
@@ -98,6 +98,51 @@ struct big_integer {
 		if (!dig.back()) {
 			dig.pop_back();
 		}
+	}
+
+	big_integer bit_shift(ptrdiff_t shift) {
+		big_integer shifted(sign, dig);
+		sign = true;
+
+		if (shift > 0) {
+			shifted.dig.resize(shifted.size() + shift / (32 - 1) + 2);
+		}
+
+		transform_to_compl2(*this, size());
+
+		for (size_t i = 0; i < shifted.size(); i++) {
+			ptrdiff_t start_bit = i * 32 - shift;
+			ptrdiff_t end_bit = (i + 1) * 32 - 1 - shift;
+			ptrdiff_t start_block = start_bit / 32u;
+			ptrdiff_t end_block = end_bit / 32u;
+
+			uint32_t cnt = (32 - shift % 32) % 32;
+			uint32_t left_block, right_block;
+
+			if ((start_bit < 0 && shift >= 0) || start_block >= static_cast<ptrdiff_t>(dig.size())) {
+				left_block = 0;
+			} else {
+				left_block = dig[start_block];
+			}
+
+			if ((end_bit < 0 && shift >= 0) || end_block >= static_cast<ptrdiff_t>(dig.size())) {
+				right_block = 0;
+			} else {
+				right_block = dig[end_block];
+			}
+
+			left_block >>= cnt;
+			right_block &= (1U << cnt) - 1U;
+
+			shifted[i] = (cnt ? (right_block << (32u - cnt)) : 0) + left_block;
+		}
+
+		if (shift < 0 && !shifted.sign) {
+			--shifted;
+		}
+
+		shifted.normalize();
+		return shifted;
 	}
 
 	uint32_t operator[](size_t index) const {
@@ -114,6 +159,19 @@ struct big_integer {
 
 	void normalize();
 
+	static void transform_to_compl2(big_integer &a, size_t new_size) {
+		if (!a.sign) {
+			++a;
+			a.dig.resize(new_size, 0u);
+
+			for (uint32_t &x : a.dig) {
+				x = ~x;
+			}
+		} else {
+			a.dig.resize(new_size, 0u);
+		}
+	}
+
 	template<class BitFunction>
 	friend big_integer bit_function_applier
 			(big_integer lhs,
@@ -121,27 +179,8 @@ struct big_integer {
 			 BitFunction const &bit_function) {
 		size_t result_len = std::max(lhs.size(), rhs.size()) + 1;
 
-		if (!lhs.sign) {
-			++lhs;
-			lhs.dig.resize(result_len, 0u);
-
-			for (uint32_t &x : lhs.dig) {
-				x = ~x;
-			}
-		} else {
-			lhs.dig.resize(result_len, 0u);
-		}
-
-		if (!rhs.sign) {
-			++rhs;
-			rhs.dig.resize(result_len, 0u);
-
-			for (uint32_t &x : rhs.dig) {
-				x = ~x;
-			}
-		} else {
-			rhs.dig.resize(result_len, 0u);
-		}
+		transform_to_compl2(lhs, result_len);
+		transform_to_compl2(rhs, result_len);
 
 		std::vector<uint32_t> result_num(result_len);
 		bool result_sign = !bit_function(!lhs.sign, !rhs.sign);
