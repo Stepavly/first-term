@@ -273,6 +273,26 @@ TEST(correctness, negation_int_min) {
   EXPECT_EQ(b - 1, std::numeric_limits<int>::max());
 }
 
+TEST(correctness, increment)
+{
+    big_integer a    = 42;
+    big_integer pre  = ++a;
+    big_integer post = a++;
+
+    EXPECT_EQ(43, pre);
+    EXPECT_EQ(43, post);
+}
+
+TEST(correctness, decrement)
+{
+    big_integer a    = 42;
+    big_integer pre  = --a;
+    big_integer post = a--;
+
+    EXPECT_EQ(41, pre);
+    EXPECT_EQ(41, post);
+}
+
 TEST(correctness, and_) {
   big_integer a = 0x55;
   big_integer b = 0xaa;
